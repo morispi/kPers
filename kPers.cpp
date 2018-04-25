@@ -216,7 +216,7 @@ std::map<std::string, int> getKPersCounts(std::set<std::string> kMers, std::set<
 	        	for (char c : char_target) {
 	        		s += c;
 	        	}
-	        	std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+	        	//std::transform(s.begin(), s.end(), s.begin(), ::tolower);
 	        	count += merCounts[s];
 	        	cptpers++;
 	        }
