@@ -160,18 +160,16 @@ std::string getCannonicalSeq(std::string seq) {
 std::map<std::string, int> getKPersCounts(std::set<std::string> kMers, std::set<std::string> candidates, int maxError, int merSize, std::map<std::string, int>& merCounts) {
 	std::map<std::string, int> kPers;
 
+	const int minErr = 1;
 	const int maxErr  = 2;
-    // const int nbRead  = candidates.size();
     const int nbRead  = 2 * candidates.size();
     // assuming all sequences have the same length
     const int lenRead = (*candidates.begin()).length();
-    // std::cerr << "lenRead : " << lenRead << std::endl;
 
     // Creating the sequence to index
     DnaString genome;
     for (std::string c : candidates){
         append(genome, c);
-        // append(genome, reverseComplement(c));
     }
     // Appending RCs (doesn't work if in the previous loop?)
     for (std::string c : candidates) {
@@ -197,43 +195,53 @@ std::map<std::string, int> getKPersCounts(std::set<std::string> kMers, std::set<
 		// Used to store small sequences by reference to the "genome"
 		Infix<DnaString>::Type inf;
 
+		String<char> char_target;
+        std::string resString;		
 
 		// Define what to do when a hit is found.
-		auto delegate = [& hits, & lenRead, & nbRead, & genome, & inf](auto & iter, DnaString const & needle, uint8_t errors) {
+		auto delegate = [& hits, & lenRead, & nbRead, & genome, & inf, &char_target, &resString, &kPers](auto & iter, DnaString const & needle, uint8_t errors) {
 		    // Storing each kmer and position  in a hit table
 		    for (auto occ : getOccurrences(iter)){
-		        inf = infix(genome, occ, occ + 16);
-		        if (occ%lenRead <= lenRead - 16 and std::find(hits[inf].begin(), hits[inf].end(), occ) == hits[inf].end()) {
+		        // if (occ%lenRead <= lenRead - 16 and std::find(hits[inf].begin(), hits[inf].end(), occ) == hits[inf].end()) {
+		        if (occ%lenRead <= lenRead - 16) {
+		        	inf = infix(genome, occ, occ + 16);
 		            hits[inf].push_back(occ);
+	            // assign(char_target, inf);
+	            // resString = "";
+	            // for (char c : char_target) {
+	            // 	resString += c;
+	            // }
+	            // std::cerr << "resString : " << resString << std::endl;
+	            // kPers[getCannonicalSeq(resString)]++;
 		        }
 		    }
 		};
 
 	    // Actually performing the research
-	    find<0, maxErr>(delegate, index, kmer, EditDistance());
+	    find<minErr, minErr>(delegate, index, kmer, EditDistance());
 	    // std::set<std::string> processedMers;
 	    // Processing results
-	    String<char> char_target;
-	    std::string s;
-	    for(auto elem: hits){
+	    // String<char> char_target;
+	    // std::string s;
+	    for(auto elem: hits) {
 	        if(length(elem.second) != 0)   {
 	        	assign(char_target, elem.first);
-	        	s = "";
+	        	resString = "";
 	        	for (char c : char_target) {
-	        		s += c;
+	        		resString += c;
 	        	}
-	        	s = getCannonicalSeq(s);
+	        	// s = getCannonicalSeq(s);
 	        	// if (processedMers.find(s) == processedMers.end()) {
 	        		// count += merCounts[s];
-	        	kPers[s]++;
+	        	kPers[getCannonicalSeq(resString)]++;
 	        		// processedMers.insert(s);
 	        	// }
-        		// count += merCounts[s];
-	        	// cptpers++;
+     //    		// count += merCounts[s];
+	    //     	// cptpers++;
 	        }
 	    }
 	    // kPers[k] = count;
-	    nbkpers++;
+	    // nbkpers++;
 	    // std::cerr << k << " has " << cptpers << " k-pers" << " and count " << count << std::endl;
 	    // std::cerr << "computed " << nbkpers << " k-pers out of " << kMers.size() << std::endl;
 	}
@@ -244,13 +252,11 @@ std::map<std::string, int> getKPersCounts(std::set<std::string> kMers, std::set<
 std::map<std::string, int> getKMersCounts(std::set<std::string> sequences, int merSize) {
 	std::map<std::string, int> merCounts;
 	int i;
-	std::string m;
 
 	for (std::string s : sequences) {
 		i = 0;
 		while (s.length() >= merSize && i < s.length() - merSize + 1) {
-			m = getCannonicalSeq(s.substr(i, merSize));
-			merCounts[m]++;
+			merCounts[getCannonicalSeq(s.substr(i, merSize))]++;
 			i++;
 		}
 	}
@@ -283,19 +289,17 @@ std::pair<std::set<std::string>, std::pair<std::pair<int, int>, std::pair<int, i
 		} else if (it->second > 0) {
 			errMers.insert(it->first);
 		}
-		// candidates.insert(it->first);
 	}
-	int genMersSize = genMers.size();
+
+	// int genMersSize = genMers.size();
 	// std::cerr << genMers.size() << " genomic k-mers" << std::endl;
 	// std::cerr << errMers.size() << " k-pers to compute" << std::endl;
 	// std::cerr << candidates.size() << " candidates for k-pers" << std::endl;
 
 	// k-pers computation
 	persCounts = getKPersCounts(errMers, similarRegions, maxError, merSize, merCounts);
-	int addCpt = 0;
 	for (std::map<std::string, int>::iterator it = persCounts.begin(); it != persCounts.end(); it++) {
 		if (it->second >= thPers) {
-			addCpt++;
 			genMers.insert(it->first);
 			if (refMers[it->first] > 0) {
 				pergen++;
@@ -303,9 +307,6 @@ std::pair<std::set<std::string>, std::pair<std::pair<int, int>, std::pair<int, i
 				pererr++;
 			}
 		} 
-	// 	// else {
-	// 	// 	errMers.insert(it->first);
-	// 	// }
 	}
 	return std::make_pair(genMers, std::make_pair(std::make_pair(mergen, mererr), std::make_pair(pergen, pererr)));
 }
@@ -347,11 +348,10 @@ consensus_t createConsensusStruct(std::string name, int qStart, bool strand, int
 
 std::set<std::string> processRead(std::set<alignment_t> alignments, std::string readsDir, int merSize, int minSupport, int minRegionLength, int thFreq, int maxError, int thPers) {
 	std::set<std::string> genMers;
-	// std::set<std::string> errMers;
 	std::set<std::string> regSeqs;
 	std::pair<std::set<std::string>, std::pair<std::pair<int, int>, std::pair<int, int>>> allMers;
 	std::set<consensus_t> curRegion;
-	int min, max, sup, startPoint;
+	int min, max, sup;
 	min = -1;
 	max = -1;
 	sup = 0;
@@ -362,29 +362,22 @@ std::set<std::string> processRead(std::set<alignment_t> alignments, std::string 
 	nbErrPers = 0;
 
 	for (std::set<alignment_t>::iterator it = alignments.begin(); it != alignments.end(); it++) {
-		// std::cerr << "processing an alignment" << std::endl;
 		if (min == -1 and max == -1) {
-			// std::cerr << "1" << std::endl;
-			startPoint = it->qStart;
 			min = it->qStart;
 			max = it->qEnd;
 			curRegion.insert(createConsensusStruct(it->qName, it->qStart, false, it->qStart));
 			curRegion.insert(createConsensusStruct(it->tName, it->tStart, it->strand, it->qStart));
 			sup += 2;
-			//elif (int(al[2]) > min and int(al[2]) > max - minRegLen) or        (int(al[3]) < max and min > int(al[3]) - minRegLen) or (int(al[2]) > min and int(al[3]) < max and int(al[2]) > int(al[3]) - minRegLen):
 		} else if ((it->qStart > min and it->qStart > max - minRegionLength) or (it->qEnd < max and min > it->qEnd - minRegionLength) or (it->qStart > min and it->qEnd < max and it->qStart > it->qEnd - minRegionLength)) {
-			// std::cerr << "2" << std::endl;
 			if (sup >= minSupport) {
 				regSeqs = processRegion(curRegion, min, max - min, readsDir);
 				allMers = computeGenomicKMers(regSeqs, merSize, thFreq, maxError, thPers);
 				genMers.insert(allMers.first.begin(), allMers.first.end());
-				// errMers.insert(allMers.second.begin(), allMers.second.end());
 				nbGenMers += allMers.second.first.first;
 				nbErrMers += allMers.second.first.second;
 				nbGenPers += allMers.second.second.first;
 				nbErrPers += allMers.second.second.second;
 			}
-			startPoint = it->qStart;
 			min = it->qStart;
 			max = it->qEnd;
 			sup = 2;
@@ -392,13 +385,11 @@ std::set<std::string> processRead(std::set<alignment_t> alignments, std::string 
 			curRegion.insert(createConsensusStruct(it->qName, it->qStart, false, it->qStart));
 			curRegion.insert(createConsensusStruct(it->tName, it->tStart, it->strand, it->qStart));
 		} else if (it->qStart <= min) {
-			// std::cerr << "3" << std::endl;
 			if (it->qEnd < max) {
 				if (sup >= minSupport and max - it->qEnd >= minRegionLength) {
 					regSeqs = processRegion(curRegion, it->qEnd, max - it->qEnd, readsDir);
 					allMers = computeGenomicKMers(regSeqs, merSize, thFreq, maxError, thPers);
 					genMers.insert(allMers.first.begin(), allMers.first.end());
-					// errMers.insert(allMers.second.begin(), allMers.second.end());
 					nbGenMers += allMers.second.first.first;
 					nbErrMers += allMers.second.first.second;
 					nbGenPers += allMers.second.second.first;
@@ -409,12 +400,10 @@ std::set<std::string> processRead(std::set<alignment_t> alignments, std::string 
 			curRegion.insert(createConsensusStruct(it->tName, it->tStart, it->strand, it->qStart));
 			sup += 1;
 		} else if (it->qStart < max) {
-			// std::cerr << "4" << std::endl;
 			if (sup >= minSupport and it->qStart - min >= minRegionLength) {
 				regSeqs = processRegion(curRegion, min, it->qStart - min, readsDir);
 				allMers = computeGenomicKMers(regSeqs, merSize, thFreq, maxError, thPers);
 				genMers.insert(allMers.first.begin(), allMers.first.end());
-				// errMers.insert(allMers.second.begin(), allMers.second.end());
 				nbGenMers += allMers.second.first.first;
 				nbErrMers += allMers.second.first.second;
 				nbGenPers += allMers.second.second.first;
@@ -426,7 +415,6 @@ std::set<std::string> processRead(std::set<alignment_t> alignments, std::string 
 					regSeqs = processRegion(curRegion, it->qEnd, max - it->qEnd, readsDir);
 					allMers = computeGenomicKMers(regSeqs, merSize, thFreq, maxError, thPers);
 					genMers.insert(allMers.first.begin(), allMers.first.end());
-					// errMers.insert(allMers.second.begin(), allMers.second.end());
 					nbGenMers += allMers.second.first.first;
 					nbErrMers += allMers.second.first.second;
 					nbGenPers += allMers.second.second.first;
@@ -437,15 +425,12 @@ std::set<std::string> processRead(std::set<alignment_t> alignments, std::string 
 			curRegion.insert(createConsensusStruct(it->tName, it->tStart, it->strand, it->qStart));
 			sup += 1;
 		}
-		// curRegion.insert(createConsensusStruct(it->tName, it->tStart, it->strand, it->qStart));
-		// sup += 1;
 	}
-	// std::cerr << "out of the loop" << std::endl;
+
 	if (sup >= minSupport) {
 		regSeqs = processRegion(curRegion, min, max - min, readsDir);
 		allMers = computeGenomicKMers(regSeqs, merSize, thFreq, maxError, thPers);
 		genMers.insert(allMers.first.begin(), allMers.first.end());
-		// errMers.insert(allMers.second.begin(), allMers.second.end());
 		nbGenMers += allMers.second.first.first;
 		nbErrMers += allMers.second.first.second;
 		nbGenPers += allMers.second.second.first;
@@ -464,7 +449,6 @@ void processReads(std::vector<std::set<alignment_t>> reads, std::string readsDir
 	for (std::vector<std::set<alignment_t>>::iterator it = reads.begin(); it != reads.end(); it++) {
 		genMers = processRead(*it, readsDir, merSize, minSupport, minRegionLength, thFreq, maxError, thPers);
 		outMtx.lock();
-		// std::cerr << genMers.size() << std::endl;
 		for (std::string s : genMers) {
 			std::cout << ">kmer" << std::endl << s << std::endl;
 		}
