@@ -23,8 +23,6 @@
 #include <seqan/stream.h>
 #include <seqan/arg_parse.h>
 
-#include "utils.hpp"
-
 using namespace seqan;
 typedef std::map< Infix<String<Dna> >::Type , std::vector<int> >   TKmerCounter;
 typedef FastFMIndexConfig<void, uint32_t, 2, 1> TFastConfig;
@@ -54,6 +52,110 @@ std::map<std::string, int> refMers;
 // 	ind = Index<DnaString, BidirectionalIndex<FMIndex<>>>(genome);
 // }
 
+struct alignment_t {
+	std::string qName;
+	int qLength;
+	int qStart;
+	int qEnd;
+	bool strand;
+	std::string tName;
+	int tLength;
+	int tStart;
+	int tEnd;
+	std::string resMatches;
+	std::string alBlockLen;
+	std::string mapQual;
+
+	bool operator<(const alignment_t& a2) const {
+		if (qName < a2.qName) {
+			return true;
+ 		} else if (qName == a2.qName && qLength < a2.qLength) {
+ 			return true;
+ 		} else if (qName == a2.qName && qLength == a2.qLength && qStart < a2.qStart) {
+ 			return true;
+ 		} else if (qName == a2.qName && qLength == a2.qLength && qStart == a2.qStart && qEnd < a2.qEnd) {
+ 			return true;
+ 		} else if (qName == a2.qName && qLength == a2.qLength && qStart == a2.qStart && qEnd == a2.qEnd && strand < a2.strand) {
+ 			return true;
+ 		} else if (qName == a2.qName && qLength == a2.qLength && qStart == a2.qStart && qEnd == a2.qEnd && strand == a2.strand && tName < a2.tName) {
+ 			return true;
+ 		} else if (qName == a2.qName && qLength == a2.qLength && qStart == a2.qStart && qEnd == a2.qEnd && strand == a2.strand && tName == a2.tName && tLength < a2.tLength) {
+ 			return true;
+ 		} else if (qName == a2.qName && qLength == a2.qLength && qStart == a2.qStart && qEnd == a2.qEnd && strand == a2.strand && tName == a2.tName && tLength == a2.tLength && tStart < a2.tStart) {
+ 			return true;
+ 		} else if (qName == a2.qName && qLength == a2.qLength && qStart == a2.qStart && qEnd == a2.qEnd && strand == a2.strand && tName == a2.tName && tLength == a2.tLength && tStart == a2.tStart && tEnd < a2.tEnd) {
+ 			return true;
+ 		} else if (qName == a2.qName && qLength == a2.qLength && qStart == a2.qStart && qEnd == a2.qEnd && strand == a2.strand && tName == a2.tName && tLength == a2.tLength && tStart == a2.tStart && tEnd == a2.tEnd && resMatches < a2.resMatches) {
+ 			return true;
+ 		} else if (qName == a2.qName && qLength == a2.qLength && qStart == a2.qStart && qEnd == a2.qEnd && strand == a2.strand && tName == a2.tName && tLength == a2.tLength && tStart == a2.tStart && tEnd == a2.tEnd && resMatches == a2.resMatches && alBlockLen < a2.alBlockLen) {
+ 			return true;
+ 		} else if (qName == a2.qName && qLength == a2.qLength && qStart == a2.qStart && qEnd == a2.qEnd && strand == a2.strand && tName == a2.tName && tLength == a2.tLength && tStart == a2.tStart && tEnd == a2.tEnd && resMatches == a2.resMatches && alBlockLen == a2.alBlockLen && mapQual < a2.mapQual) {
+ 			return true;
+ 		} else {
+ 			return false;
+ 		}
+	}
+};
+
+struct consensus_t {
+	std::string readId;
+	int startPos;
+	bool strand;
+	int relPos;
+
+	bool operator<(const consensus_t& c2) const {
+		if (readId < c2.readId) {
+			return true;
+		} else if (readId == c2.readId && startPos < c2.startPos) {
+			return true;
+		} else if (readId == c2.readId && startPos == c2.startPos && strand < c2.strand) {
+			return true;
+		} else if (readId == c2.readId && startPos < c2.startPos && strand == c2.strand && relPos < c2.relPos) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+};
+
+std::string reverseComplement(std::string seq) {
+	std::string res = std::string(seq);
+	for (int i = 0 ; i < seq.length() ; i++) {
+		switch(seq[i]) {
+			case 'A':
+				res[seq.length() - i - 1] = 'T';
+				break;
+			case 'C':
+				res[seq.length() - i - 1] = 'G';
+				break;
+			case 'G':
+				res[seq.length() - i - 1] = 'C';
+				break;
+			case 'T':
+				res[seq.length() - i - 1] = 'A';
+				break;
+			case 'a':
+				res[seq.length() - i - 1] = 't';
+				break;
+			case 'c':
+				res[seq.length() - i - 1] = 'g';
+				break;
+			case 'g':
+				res[seq.length() - i - 1] = 'c';
+				break;
+			case 't':
+				res[seq.length() - i - 1] = 'a';
+				break;
+		}
+	}
+
+	return res;
+}	
+
+std::string getCannonicalSeq(std::string seq) {
+	std::string revComp = reverseComplement(seq);
+	return seq < revComp ? seq : revComp;
+}
 
 std::map<std::string, int> getKPersCounts(std::set<std::string> kMers, std::set<std::string> candidates, int maxError, int merSize, std::map<std::string, int>& merCounts) {
 	std::map<std::string, int> kPers;
@@ -73,7 +175,7 @@ std::map<std::string, int> getKPersCounts(std::set<std::string> kMers, std::set<
     }
     // Appending RCs (doesn't work if in the previous loop?)
     for (std::string c : candidates) {
-    	append(genome, utils::reverseComplement(c));
+    	append(genome, reverseComplement(c));
     }
     
 
@@ -220,7 +322,7 @@ std::set<std::string> processRegion(std::set<consensus_t> alignments, int SHIFT,
 			getline(f, line);
 			f.close();
 			if (it->strand == true) {
-				line = utils::reverseComplement(line);
+				line = reverseComplement(line);
 			}
 			beg = it->startPos + SHIFT - it->relPos;
 			if (beg < line.length()) {
@@ -533,8 +635,6 @@ void clusterGenK(std::string alignmentFile, std::string readsDir, int merSize, i
 }
 
 int main(int argc, char* argv[]) {
-
-
 	if (argc < 2) {
 		fprintf(stderr, "Usage: %s [-a alignmentFile.paf] [-d RawLongReadsDir] [-k merSize] [-s minSupportForGoodRegions] [-l minLengthForGoodRegions] [-f freqThresholdForKMers] [-e maxError] [-p freqThresholdForKPers] [-m mode (0 for regions, 1 for cluster)] [-j threadsNb] \n\n", argv[0]);
 		exit(EXIT_FAILURE);
