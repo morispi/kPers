@@ -9,5 +9,5 @@ tar xvzf LR.fasta.tar.gz
 ./minimap2/minimap2 -Xw5 -m100 -g10000 LR.fasta LR.fasta > LR.paf
 sort -k1,1 -k3,3n -k4,4n -k8,8n -k9,9n LR.paf > tmp
 mv tmp LR.paf
-g++ -O2 -mtune=native -march=native -std=c++14 kPers.cpp -lrt
+g++ -O2 -mtune=native -march=native -std=c++14 kPers.cpp -lrt -lpthread
 mv a.out kPers
